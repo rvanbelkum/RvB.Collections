@@ -5,11 +5,26 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+		<GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+		<Title>Various colllection based data structures</Title>
+		<Authors>rvanbelkum</Authors>
+		<Description>Various colllection based data structures</Description>
+		<PackageProjectUrl>https://github.com/rvanbelkum/RvB.Collections</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/rvanbelkum/RvB.Collections</RepositoryUrl>
+		<NeutralLanguage>en</NeutralLanguage>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageProjectUrl>https://licenses.nuget.org/MIT</PackageProjectUrl>
+		<PackageReadmeFile>readme.md</PackageReadmeFile>
+		<PackageVersion>1.0.0</PackageVersion>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <None Remove=".gitattributes" />
-	  <None Remove=".gitignore" />
+		<None Remove=".gitattributes" />
+		<None Remove=".gitignore" />
+		<None Include="readme.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<ItemGroup>
