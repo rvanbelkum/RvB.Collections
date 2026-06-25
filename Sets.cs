@@ -1,229 +1,318 @@
-﻿using System.Collections;
+﻿using static RvB.Collections.SetsV2Enumerators;
 
 namespace RvB.Collections;
 
-public struct SubSet<T> : IEnumerable<T> {
-    private T[] _subset;
+public static class Sets {
+    public static SubsetsOrderInsensitive<T> SubsetsOrderInsensitive<T>(this IEnumerable<T> set, int subsetSize)
+        => new(CheckAndGetArray(set, subsetSize), subsetSize);
 
-    public SubSet(T[] subset) {
-        _subset = subset;
+    public static SubsetsOrderInsensitive<T> SubsetsOrderInsensitive<T>(this Span<T> set, int subsetSize)
+        => new(CheckAndGetArray((ReadOnlySpan<T>)set, subsetSize), subsetSize);
+
+    public static SubsetsOrderInsensitive<T> SubsetsOrderInsensitive<T>(this ReadOnlySpan<T> set, int subsetSize)
+        => new(CheckAndGetArray(set, subsetSize), subsetSize);
+
+    public static SubsetsRange<T> SubsetsOrderInsensitive<T>(this IEnumerable<T> set, int subsetMinSize, int subsetMaxSize) {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(subsetMinSize, nameof(subsetMinSize));
+        ArgumentOutOfRangeException.ThrowIfLessThan(subsetMaxSize, subsetMinSize, nameof(subsetMaxSize));
+        var array = CheckAndGetArray(set, subsetMinSize);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(subsetMaxSize, array.Length, nameof(subsetMaxSize));
+        return new SubsetsRange<T>(new SubsetsOrderInsensitive<T>(array, subsetMinSize), subsetMinSize, subsetMaxSize);
     }
 
-    public int Length => _subset.Length;
+    public static SubsetsOrderSensitive<T> SubsetsOrderSensitive<T>(this IEnumerable<T> set, int subsetSize)
+        => new(CheckAndGetArray(set, subsetSize), subsetSize);
 
-    public T this[int index] => _subset[index];
+    public static SubsetsOrderSensitive<T> SubsetsOrderSensitive<T>(this Span<T> set, int subsetSize)
+        => new(CheckAndGetArray((ReadOnlySpan<T>)set, subsetSize), subsetSize);
 
-    public IEnumerator<T> GetEnumerator() => ((IEnumerable<T>)_subset).GetEnumerator();
+    public static SubsetsOrderSensitive<T> SubsetsOrderSensitive<T>(this ReadOnlySpan<T> set, int subsetSize)
+        => new(CheckAndGetArray(set, subsetSize), subsetSize);
 
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    public static SubsetsRange<T> SubsetsOrderSensitive<T>(this IEnumerable<T> set, int subsetMinSize, int subsetMaxSize) {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(subsetMinSize, nameof(subsetMinSize));
+        ArgumentOutOfRangeException.ThrowIfLessThan(subsetMaxSize, subsetMinSize, nameof(subsetMaxSize));
+        var array = CheckAndGetArray(set, subsetMinSize);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(subsetMaxSize, array.Length, nameof(subsetMaxSize));
+        return new SubsetsRange<T>(new SubsetsOrderSensitive<T>(array, subsetMinSize), subsetMinSize, subsetMaxSize);
+    }
+
+    public static SubsetsFull<T> SubsetsFull<T>(this IEnumerable<T> set, int subsetSize)
+        => new(CheckAndGetArray(set, subsetSize), subsetSize);
+
+    public static SubsetsFull<T> SubsetsFull<T>(this Span<T> set, int subsetSize)
+        => new(CheckAndGetArray((ReadOnlySpan<T>)set, subsetSize), subsetSize);
+
+    public static SubsetsFull<T> SubsetsFull<T>(this ReadOnlySpan<T> set, int subsetSize)
+        => new(CheckAndGetArray(set, subsetSize), subsetSize);
+
+    public static SubsetsRange<T> SubsetsFull<T>(this IEnumerable<T> set, int subsetMinSize, int subsetMaxSize) {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(subsetMinSize, nameof(subsetMinSize));
+        ArgumentOutOfRangeException.ThrowIfLessThan(subsetMaxSize, subsetMinSize, nameof(subsetMaxSize));
+        var array = CheckAndGetArray(set, subsetMinSize);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(subsetMaxSize, array.Length, nameof(subsetMaxSize));
+        return new SubsetsRange<T>(new SubsetsFull<T>(array, subsetMinSize), subsetMinSize, subsetMaxSize);
+    }
+
+    private static T[] CheckAndGetArray<T>(IEnumerable<T> set, int subsetSize) {
+        ArgumentNullException.ThrowIfNull(set, nameof(set));
+        var array = set.ToArray();
+        if (subsetSize > array.Length)
+            throw new ArgumentException("Subset size is larger than set size", nameof(subsetSize));
+        return array;
+    }
+
+    private static T[] CheckAndGetArray<T>(ReadOnlySpan<T> set, int subsetSize) {
+        var array = set.ToArray();
+        if (subsetSize > array.Length)
+            throw new ArgumentException("Subset size is larger than set size", nameof(subsetSize));
+        return array;
+    }
 }
 
-public static class Sets {
-    public enum SetType {
-        /// <summary>
-        /// Order of the set is not significant: [1,2] is equivalent to [2,1]
-        /// </summary>
-        OrderInsensitive,
-        /// <summary>
-        /// Order of the set is significant: [1,2] is different from [2,1]
-        /// </summary>
-        OrderSensitive,
-        Full,
-    }
+public interface ISetEnumerator<T> {
+    int Size { get; }
+    ReadOnlySpan<T> Current { get; }
+    bool MoveNext();
+    internal ISetEnumerator<T> GetEnumerator(int subsetSize);
+}
 
-    /// <summary>
-    /// Generates subsets of a given size from a bigger set.
-    /// </summary>
-    /// <typeparam name="T">The type of the elements in the set</typeparam>
-    /// <param name="set">Original set</param>
-    /// <param name="subsetSize">Size of the subsets generated</param>
-    /// <param name="type">Type of subsets to be generated</param>
-    /// <returns></returns>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="subsetSize"/> is less than 1</exception>
-    public static IEnumerable<SubSet<T>> Subsets<T>(IEnumerable<T> set, int subsetSize, SetType type) {
-        if (subsetSize < 1)
-            throw new ArgumentException("Subset size needs to be at least 1", nameof(subsetSize));
-        return type switch {
-            SetType.OrderInsensitive => SubsetsOrderInsensitive(set, subsetSize),
-            SetType.OrderSensitive => SubsetsOrderSensitive(set, subsetSize),
-            SetType.Full => SubsetsFull(set, new T[subsetSize], 0),
-            _ => throw new NotImplementedException(),
-        };
-    }
+/// <summary>
+/// Class containing the set enumerators. It's separated from SetsV2 so that intellisense will only show relevant methods.
+/// </summary>
+public static class SetsV2Enumerators {
+    public struct SubsetsOrderInsensitive<T> : ISetEnumerator<T> {
+        private readonly T[] _array;
+        private readonly int _subsetSize;
+        private readonly T[] _subset;
+        private readonly int[] _indices;
+        private bool _firstSet = true;
+        private bool _firstEnumerator = true;
 
-
-    private static IEnumerable<SubSet<T>> SubsetsOrderInsensitive<T>(IEnumerable<T> set, int subsetSize) {
-        var setArray = set.ToArray();
-        if (subsetSize > setArray.Length)
-            throw new ArgumentException("Subset size is larger than set size", nameof(subsetSize));
-
-        var subset = new T[subsetSize];
-        var indices = new int[subsetSize];
-
-        for (var i = 0; i < indices.Length; ++i) {
-            indices[i] = i;
-            subset[i] = setArray[indices[i]];
+        internal SubsetsOrderInsensitive(T[] array, int subsetSize) {
+            _array = array;
+            _subsetSize = subsetSize;
+            _subset = array[..subsetSize];
+            _indices = [.. Enumerable.Range(0, subsetSize)];
         }
-        while (true) {
-            yield return new(subset);
 
-            int indicesIndex = indices.Length - 1;
-            bool ok = indices[indicesIndex] < setArray.Length - 1;
+        public readonly int Size => _subsetSize;
+
+        public SubsetsOrderInsensitive<T> GetEnumerator() {
+            if (_firstEnumerator) {
+                _firstEnumerator = false;
+                return this;
+            }
+            return new(_array, _subsetSize) { _firstEnumerator = false };
+        }
+
+        readonly ISetEnumerator<T> ISetEnumerator<T>.GetEnumerator(int subsetSize)
+            => new SubsetsOrderInsensitive<T>(_array, subsetSize);
+
+        public readonly ReadOnlySpan<T> Current => _subset;
+
+        public bool MoveNext() {
+            if (_firstSet) {
+                _firstSet = false;
+                return true;
+            }
+            int indicesIndex = _indices.Length - 1;
+            bool ok = _indices[indicesIndex] < _array.Length - 1;
             while (!ok) {
                 indicesIndex -= 1;
-                if (indicesIndex < 0)
-                    yield break;
-                ok = (indices[indicesIndex] + indices.Length - indicesIndex < setArray.Length);
+                if (indicesIndex < 0) {
+                    return false;
+                }
+                ok = (_indices[indicesIndex] + _indices.Length - indicesIndex < _array.Length);
             }
-            indices[indicesIndex] += 1;
-            subset[indicesIndex] = setArray[indices[indicesIndex]];
-            while (indicesIndex < indices.Length - 1) {
-                var newIndex = indices[indicesIndex] + 1;
+            _indices[indicesIndex] += 1;
+            _subset[indicesIndex] = _array[_indices[indicesIndex]];
+            while (indicesIndex < _indices.Length - 1) {
+                var newIndex = _indices[indicesIndex] + 1;
                 indicesIndex += 1;
-                indices[indicesIndex] = newIndex;
-                subset[indicesIndex] = setArray[newIndex];
+                _indices[indicesIndex] = newIndex;
+                _subset[indicesIndex] = _array[newIndex];
             }
+            return true;
         }
     }
 
-    private static IEnumerable<SubSet<T>> SubsetsOrderSensitive<T>(IEnumerable<T> set, int subsetSize) {
-        var setArray = set.ToArray();
-        if (subsetSize > setArray.Length)
-            throw new ArgumentException("Subset size is larger than set size", nameof(subsetSize));
+    public struct SubsetsOrderSensitive<T> : ISetEnumerator<T> {
+        private readonly T[] _array;
+        private readonly int _subsetSize;
+        private readonly T[] _subset;
+        private readonly int[] _indices;
+        private readonly bool[] _usedIndices2;
+        private bool _firstSet = true;
+        private bool _firstEnumerator = true;
 
-        var subset = new T[subsetSize];
-        var indices = new int[subsetSize];
-        HashSet<int> usedIndices = [];
+        internal SubsetsOrderSensitive(T[] array, int subsetSize) {
+            _array = array;
+            _subsetSize = subsetSize;
 
-        for (var i = 0; i < indices.Length; ++i) {
-            indices[i] = i;
-            subset[i] = setArray[indices[i]];
-            usedIndices.Add(i);
+            _subset = array[..subsetSize];
+            _indices = [.. Enumerable.Range(0, subsetSize)];
+            _usedIndices2 = [.. Enumerable.Range(0, subsetSize).Select(_ => true)];
         }
-        while (true) {
-            yield return new(subset);
 
-            int indicesIndex = indices.Length - 1;
+        public readonly int Size => _subsetSize;
+
+        public SubsetsOrderSensitive<T> GetEnumerator() {
+            if (_firstEnumerator) {
+                _firstEnumerator = false;
+                return this;
+            }
+            return new(_array, _subsetSize) { _firstEnumerator = false };
+        }
+
+        readonly ISetEnumerator<T> ISetEnumerator<T>.GetEnumerator(int subsetSize)
+            => new SubsetsOrderSensitive<T>(_array, subsetSize);
+
+        public readonly ReadOnlySpan<T> Current => _subset;
+
+        public bool MoveNext() {
+            if (_firstSet) {
+                _firstSet = false;
+                return true;
+            }
+            int indicesIndex = _indices.Length - 1;
             int nextIndex;
             while (true) {
-                usedIndices.Remove(indices[indicesIndex]);
-                nextIndex = indices[indicesIndex] + 1;
-                while (usedIndices.Contains(nextIndex))
+                _usedIndices2[_indices[indicesIndex]] = false;
+                nextIndex = _indices[indicesIndex] + 1;
+                while (nextIndex < _array.Length && _usedIndices2[nextIndex]) {
                     nextIndex += 1;
-                if (nextIndex < setArray.Length) {
-                    indices[indicesIndex] = nextIndex;
-                    subset[indicesIndex] = setArray[nextIndex];
-                    usedIndices.Add(nextIndex);
+                }
+                if (nextIndex < _array.Length) {
+                    _indices[indicesIndex] = nextIndex;
+                    _subset[indicesIndex] = _array[nextIndex];
+                    _usedIndices2[nextIndex] = true;
                     break;
                 }
                 indicesIndex -= 1;
-                if (indicesIndex < 0)
-                    yield break;
+                if (indicesIndex < 0) {
+                    return false;
+                }
             }
             nextIndex = 0;
-            while (indicesIndex < indices.Length - 1) {
+            while (indicesIndex < _indices.Length - 1) {
                 indicesIndex += 1;
-                while (usedIndices.Contains(nextIndex))
+                while (_usedIndices2[nextIndex]) {
                     nextIndex += 1;
-                indices[indicesIndex] = nextIndex;
-                subset[indicesIndex] = setArray[nextIndex];
-                usedIndices.Add(nextIndex);
+                }
+                _indices[indicesIndex] = nextIndex;
+                _subset[indicesIndex] = _array[nextIndex];
+                _usedIndices2[nextIndex] = true;
                 nextIndex += 1;
             }
+            return true;
         }
     }
 
-    private static IEnumerable<SubSet<T>> SubsetsFull<T>(IEnumerable<T> set, T[] subset, int index) {
-        foreach (var e in set) {
-            subset[index] = e;
-            if (index == subset.Length - 1) {
-                yield return new(subset);
-            } else {
-                foreach (var ss in SubsetsFull(set, subset, index + 1)) {
-                    yield return ss;
-                }
+    public struct SubsetsFull<T> : ISetEnumerator<T> {
+        private readonly T[] _array;
+        private readonly int _subsetSize;
+        private readonly T[] _subset;
+        private readonly int[] _indices;
+        private bool _firstSet = true;
+        private bool _firstEnumerator = true;
+
+        public readonly int Size => _subsetSize;
+
+        internal SubsetsFull(T[] array, int subsetSize) {
+            _array = array;
+            _subsetSize = subsetSize;
+            _subset = [.. Enumerable.Range(0, subsetSize).Select(_ => array[0])];
+            _indices = new int[_subsetSize];
+        }
+
+        public SubsetsFull<T> GetEnumerator() {
+            if (_firstEnumerator) {
+                _firstEnumerator = false;
+                return this;
             }
+            return new(_array, _subsetSize) { _firstEnumerator = false };
+        }
+
+        readonly ISetEnumerator<T> ISetEnumerator<T>.GetEnumerator(int subsetSize)
+            => new SubsetsFull<T>(_array, subsetSize);
+
+        public readonly ReadOnlySpan<T> Current => _subset;
+
+        public bool MoveNext() {
+            if (_firstSet) {
+                _firstSet = false;
+                return true;
+            }
+            var index = _indices.Length - 1;
+            while (index >= 0 && _indices[index] >= _array.Length - 1) {
+                _indices[index] = 0;
+                _subset[index] = _array[0];
+                index -= 1;
+            }
+            if (index < 0) {
+                return false;
+            }
+            _indices[index] += 1;
+            _subset[index] = _array[_indices[index]];
+            return true;
         }
     }
 
-    private static IEnumerable<T[]> SubsetsOrderSensitive<T>(IEnumerable<T> set, T[] subset, int index, HashSet<T> exclude) {
-        foreach (var e in set) {
-            if (exclude.Add(e)) {
-                subset[index] = e;
-                if (index == subset.Length - 1)
-                    yield return subset;
-                else {
-                    foreach (var ss in SubsetsOrderSensitive(set, subset, index + 1, exclude)) {
-                        yield return ss;
-                    }
-                }
-                exclude.Remove(e);
+    public struct SubsetsRange<T> : ISetEnumerator<T> {
+        private int _subsetSize;
+        private readonly int _subsetMinSize;
+        private readonly int _subsetMaxSize;
+        private bool _firstEnumerator = true;
+        private ISetEnumerator<T> _enumerator;
+
+        internal SubsetsRange(ISetEnumerator<T> enumerator, int subsetMinSize, int subsetMaxSize) {
+            _enumerator = enumerator;
+            _subsetSize = _subsetMinSize = subsetMinSize;
+            _subsetMaxSize = subsetMaxSize;
+        }
+
+        public readonly int Size => _subsetSize;
+
+        public SubsetsRange<T> GetEnumerator() {
+            if (_firstEnumerator) {
+                _firstEnumerator = false;
+                return this;
             }
+            return new(_enumerator, _subsetMinSize, _subsetMaxSize) { _firstEnumerator = false };
+        }
+
+        readonly ISetEnumerator<T> ISetEnumerator<T>.GetEnumerator(int subsetSize)
+            => throw new NotSupportedException();
+
+        public readonly ReadOnlySpan<T> Current => _enumerator.Current;
+
+        public bool MoveNext() {
+            if (_enumerator.MoveNext()) {
+                return true;
+            }
+            if (_subsetSize == _subsetMaxSize) {
+                return false;
+            }
+            _subsetSize += 1;
+            _enumerator = _enumerator.GetEnumerator(_subsetSize);
+            return _enumerator.MoveNext();
         }
     }
+}
 
-    public static IEnumerable<IEnumerable<T>> Subsets<T>(
-            IEnumerable<T> set,
-            int n,
-            Func<T, T, bool>? successorPredicate = null
-        ) where T : IComparable<T> {
-
-        if (n == 1) {
-            foreach (var e in set)
-                yield return new T[] { e };
-        } else {
-            foreach (var e in set) {
-                foreach (var ss in Subsets(set.Where(elt => successorPredicate == null || successorPredicate(e, elt)), n - 1, successorPredicate)) {
-                    yield return ss.Prepend(e);
-                }
-            }
+public static class SetEnumeratorExtensions {
+    public static List<T[]> ToList<T>(this ISetEnumerator<T> enumerator) {
+        var list = new List<T[]>();
+        while (enumerator.MoveNext()) {
+            var result = new T[enumerator.Size];
+            enumerator.Current.CopyTo(result.AsSpan());
+            list.Add(result);
         }
+        return list;
     }
 
-    public static IEnumerable<IEnumerable<T>> Subsets<T>(
-            IEnumerable<T> set,
-            int n,
-            Func<T, T, bool>? successorPredicate = null,
-            Func<T[], bool>? subsetPredicate = null
-        ) where T : IComparable<T> {
-
-        var setArray = set.ToArray();
-        if (n > setArray.Length)
-            yield break;
-
-        var resultSetIndex = new int[n];
-        for (int i = 0; i < resultSetIndex.Length; ++i) {
-            resultSetIndex[i] = 0;
-        }
-
-        var result = new T[n];
-        var resultIdx = 0;
-        while (resultIdx >= 0) {
-            var value = setArray[resultSetIndex[resultIdx]];
-            bool valid = true;
-            bool increase = false;
-            if (resultIdx > 0 && successorPredicate != null)
-                valid = successorPredicate(result[resultIdx - 1], value);
-            if (valid) {
-                result[resultIdx] = value;
-                valid = (subsetPredicate == null || subsetPredicate(result[0..(resultIdx + 1)]));
-            }
-            if (valid) {
-                if (resultIdx == n - 1) {
-                    yield return result;
-                    increase = true;
-                } else {
-                    resultIdx += 1;
-                }
-            }
-            if (!valid || increase) {
-                while (resultIdx >= 0 && ++resultSetIndex[resultIdx] == setArray.Length) {
-                    resultSetIndex[resultIdx] = 0;
-                    resultIdx--;
-                }
-                //if (resultIdx < 0)
-                //    yield break;
-            }
-        }
+    public static T[][] ToArray<T>(this ISetEnumerator<T> enumerator) {
+        return [.. ToList(enumerator)];
     }
 }
